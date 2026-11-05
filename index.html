@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Рулетка Призов</title>
+    <!-- Подключаем Telegram WebApp SDK -->
+    <script src="https://telegram.org"></script>
+    <style>
+        body {
+            background-color: #1c252e;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .wheel-box {
+            position: relative;
+            width: 320px;
+            height: 320px;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 25px solid #ff3b30;
+            z-index: 10;
+        }
+        .btn {
+            margin-top: 30px;
+            background: #248bed;
+            border: none;
+            padding: 15px 40px;
+            color: white;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(36,139,237,0.3);
+        }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div class="wheel-box">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="400" height="400"></canvas>
+    </div>
+    
+    <button class="btn" id="spin-btn" onclick="spin()">Испытать удачу</button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Раскрываем на весь экран
+
+        // Список призов (должен совпадать с prizes.py)
+        const prizes = [
+            {"id": 1, "name": "Зеленое яблоко", "emoji": "🍏"},
+            {"id": 2, "name": "Мандарин", "emoji": "🍊"},
+            {"id": 3, "name": "Лимон", "emoji": "🍋"},
+            {"id": 4, "name": "Банан", "emoji": "🍌"},
+            {"id": 5, "name": "Виноград", "emoji": "🍇"},
+            {"id": 6, "name": "Вишня", "emoji": "🍒"},
+            {"id": 7, "name": "Клубника", "emoji": "🍓"},
+            {"id": 8, "name": "Арбуз", "emoji": "🍉"},
+            {"id": 9, "name": "Персик", "emoji": "🍑"},
+            {"id": 10, "name": "Киви", "emoji": "🥝"}
+        ];
+
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const numSectors = prizes.length;
+        const arc = 2 * Math.PI / numSectors;
+        let startAngle = 0;
+        let isSpinning = false;
+
+        // Рисуем сектора и эмодзи
+        function drawWheel() {
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#009688', '#4caf50', '#ffeb3b', '#ff9800'];
+            for (let i = 0; i < numSectors; i++) {
+                const angle = startAngle + i * arc;
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.beginPath();
+                ctx.moveTo(200, 200);
+                ctx.arc(200, 200, 200, angle, angle + arc);
+                ctx.lineTo(200, 200);
+                ctx.fill();
+
+                // Рисуем текст (эмодзи)
+                ctx.save();
+                ctx.translate(200, 200);
+                ctx.rotate(angle + arc / 2);
+                ctx.textAlign = "right";
+                ctx.font = "30px Arial";
+                ctx.fillStyle = "#fff";
+                ctx.fillText(prizes[i].emoji, 170, 10);
+                ctx.restore();
+            }
+        }
+
+        drawWheel();
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            document.getElementById('spin-btn').disabled = true;
+
+            const randomSector = Math.floor(Math.random() * numSectors);
+            const spinAngle = (360 * 5) + (360 - (randomSector * (360 / numSectors))) - (360 / numSectors / 2); 
+            const spinRad = spinAngle * Math.PI / 180;
+            
+            let currentRotation = 0;
+            const duration = 4000; // 4 секунды кручения
+            const start = performance.now();
+
+            function animate(time) {
+                let progress = (time - start) / duration;
+                if (progress > 1) progress = 1;
+
+                // Плавное замедление (easeOutQuad)
+                const ease = progress * (2 - progress);
+                startAngle = ease * spinRad;
+                drawWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    isSpinning = false;
+                    const winner = prizes[randomSector];
+                    
+                    // Передаем id и имя приза обратно боту
+                    tg.sendData(JSON.stringify({ id: winner.id, name: winner.name, emoji: winner.emoji }));
+                    tg.close(); // Закрываем WebApp
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>
