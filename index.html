@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Рулетка Призов</title>
-    <!-- Подключаем Telegram WebApp SDK -->
+    <!-- ПРАВИЛЬНОЕ ПОДКЛЮЧЕНИЕ TELEGRAM SDK -->
     <script src="https://telegram.org"></script>
     <style>
         body {
@@ -67,10 +67,13 @@
     <button class="btn" id="spin-btn" onclick="spin()">Испытать удачу</button>
 
     <script>
+        // Инициализируем Telegram WebApp
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрываем на весь экран
+        if (tg) {
+            tg.expand(); // Раскрываем приложение на весь экран телефона
+        }
 
-        // Список призов (должен совпадать с prizes.py)
+        // Список призов (строго совпадает со списком в боте)
         const prizes = [
             {"id": 1, "name": "Зеленое яблоко", "emoji": "🍏"},
             {"id": 2, "name": "Мандарин", "emoji": "🍊"},
@@ -91,7 +94,7 @@
         let startAngle = 0;
         let isSpinning = false;
 
-        // Рисуем сектора и эмодзи
+        // Отрисовка цветных секторов и фруктов
         function drawWheel() {
             const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#009688', '#4caf50', '#ffeb3b', '#ff9800'];
             for (let i = 0; i < numSectors; i++) {
@@ -103,7 +106,7 @@
                 ctx.lineTo(200, 200);
                 ctx.fill();
 
-                // Рисуем текст (эмодзи)
+                // Рисуем эмодзи приза внутри сектора
                 ctx.save();
                 ctx.translate(200, 200);
                 ctx.rotate(angle + arc / 2);
@@ -115,8 +118,10 @@
             }
         }
 
+        // Рисуем колесо при первой загрузке страницы
         drawWheel();
 
+        // Логика вращения
         function spin() {
             if (isSpinning) return;
             isSpinning = true;
@@ -126,15 +131,14 @@
             const spinAngle = (360 * 5) + (360 - (randomSector * (360 / numSectors))) - (360 / numSectors / 2); 
             const spinRad = spinAngle * Math.PI / 180;
             
-            let currentRotation = 0;
-            const duration = 4000; // 4 секунды кручения
+            const duration = 4000; // Время вращения в миллисекундах (4 секунды)
             const start = performance.now();
 
             function animate(time) {
                 let progress = (time - start) / duration;
                 if (progress > 1) progress = 1;
 
-                // Плавное замедление (easeOutQuad)
+                // Плавная остановка колеса (плавное замедление)
                 const ease = progress * (2 - progress);
                 startAngle = ease * spinRad;
                 drawWheel();
@@ -145,9 +149,15 @@
                     isSpinning = false;
                     const winner = prizes[randomSector];
                     
-                    // Передаем id и имя приза обратно боту
-                    tg.sendData(JSON.stringify({ id: winner.id, name: winner.name, emoji: winner.emoji }));
-                    tg.close(); // Закрываем WebApp
+                    // Передаем данные обратно нашему боту в Telegram
+                    if (tg) {
+                        tg.sendData(JSON.stringify({ id: winner.id, name: winner.name, emoji: winner.emoji }));
+                        tg.close(); // Автоматически закрываем окно веб-приложения
+                    } else {
+                        // Заглушка, если открыли просто в обычном браузере на ПК
+                        alert("Вы выиграли: " + winner.emoji + " " + winner.name);
+                        document.getElementById('spin-btn').disabled = false;
+                    }
                 }
             }
             requestAnimationFrame(animate);
