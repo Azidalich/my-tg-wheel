@@ -67,7 +67,7 @@
     <button class="btn" id="spin-btn" onclick="spin()">Испытать удачу</button>
 
     <script>
-        // БЕЗОПАСНАЯ ПРОВЕРКА TELEGRAM SDK (Чтобы код не падал на ПК)
+        // БЕЗОПАСНАЯ ПРОВЕРКА TELEGRAM SDK
         const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
         
         if (tg) {
@@ -123,18 +123,25 @@
             isSpinning = true;
             document.getElementById('spin-btn').disabled = true;
 
-            const randomSector = Math.floor(Math.random() * numSectors);
-            const spinAngle = (360 * 5) + (360 - (randomSector * (360 / numSectors))) - (360 / numSectors / 2); 
+            // Читаем из ссылки, какой ID должен выиграть (передано ботом)
+            const urlParams = new URLSearchParams(window.location.search);
+            const winId = parseInt(urlParams.get('win')) || 1; 
+            
+            // Находим индекс этого приза в нашем массиве секторов
+            const targetSector = prizes.findIndex(p => p.id === winId);
+
+            // Высчитываем точный угол остановки, чтобы стрелка попала в нужный сектор
+            const spinAngle = (360 * 5) + (360 - (targetSector * (360 / numSectors))) - (360 / numSectors / 2); 
             const spinRad = spinAngle * Math.PI / 180;
             
-            const duration = 4000; 
+            const duration = 4000; // Крутим ровно 4 секунды
             const start = performance.now();
 
             function animate(time) {
                 let progress = (time - start) / duration;
                 if (progress > 1) progress = 1;
 
-                const ease = progress * (2 - progress);
+                const ease = progress * (2 - progress); // Плавное замедление торможения
                 startAngle = ease * spinRad;
                 drawWheel();
 
@@ -142,13 +149,14 @@
                     requestAnimationFrame(animate);
                 } else {
                     isSpinning = false;
-                    const winner = prizes[randomSector];
+                    const winner = prizes[targetSector];
                     
                     if (tg) {
-                        tg.sendData(JSON.stringify({ id: winner.id, name: winner.name, emoji: winner.emoji }));
-                        tg.close(); 
+                        // Отправляем ID боту обратно, чтобы он выдал привязанную фотку/видео
+                        tg.sendData(JSON.stringify({ id: winner.id }));
+                        tg.close(); // Закрываем рулетку
                     } else {
-                        alert("Вы выиграли: " + winner.emoji + " " + winner.name);
+                        alert("Режим теста на ПК! Выпал сектор: " + winner.emoji + " " + winner.name);
                         document.getElementById('spin-btn').disabled = false;
                     }
                 }
