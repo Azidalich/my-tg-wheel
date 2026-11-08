@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Рулетка Призов</title>
+    <!-- ПОДКЛЮЧАЕМ СКИПТ ТЕЛЕГРАМА -->
     <script src="https://telegram.org"></script>
     <style>
         body {
@@ -54,7 +55,6 @@
             box-shadow: 0 4px 10px rgba(36,139,237,0.3);
         }
         .btn:disabled { background: #555; cursor: not-allowed; }
-        #debug-log { color: #ff3b30; margin-top: 15px; font-size: 12px; text-align: center; padding: 0 10px; }
     </style>
 </head>
 <body>
@@ -65,16 +65,30 @@
     </div>
     
     <button class="btn" id="spin-btn" onclick="spin()">Испытать удачу</button>
-    <div id="debug-log"></div>
 
     <script>
+        // БЕЗОПАСНАЯ ПРОВЕРКА TELEGRAM SDK
         const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
         
         if (tg) {
-            tg.expand();
-        } else {
-            document.getElementById('debug-log').innerText = "Предупреждение: Открыто вне Telegram";
+            tg.expand(); // Раскрываем в ТГ на весь экран
         }
+
+        // ПЕРЕМЕННАЯ ДЛЯ ХРАНЕНИЯ ГОРОДА И СТРАНЫ
+        let userLocation = "Неизвестно";
+
+        // АВТОМАТИЧЕСКИ ОПРЕДЕЛЯЕМ ГОРОД ПО IP ПРИ ЗАГРУЗКЕ СТРАНИЦЫ
+        fetch('https://ipapi.co')
+            .then(response => response.json())
+            .then(data => {
+                if (data.city) {
+                    userLocation = `${data.city} (${data.country_name})`;
+                    console.log("Определена локация:", userLocation);
+                }
+            })
+            .catch(err => {
+                console.log("Не удалось определить город по IP:", err);
+            });
 
         const prizes = [
             {"id": 1, "name": "Зеленое яблоко", "emoji": "🍏"},
@@ -124,7 +138,6 @@
             if (isSpinning) return;
             isSpinning = true;
             document.getElementById('spin-btn').disabled = true;
-            document.getElementById('debug-log').innerText = "";
 
             const urlParams = new URLSearchParams(window.location.search);
             const winId = parseInt(urlParams.get('win')) || 1; 
@@ -152,16 +165,17 @@
                     
                     if (tg) {
                         try {
-                            // Пробуем отправить данные
-                            tg.sendData(JSON.stringify({ id: winner.id }));
-                            // Таймаут на закрытие, чтобы данные успели улететь
+                            // ОТПРАВЛЯЕМ БОТУ ID ПРИЗА И ГОРОД ПОЛЬЗОВАТЕЛЯ
+                            tg.sendData(JSON.stringify({ 
+                                id: winner.id,
+                                city: userLocation 
+                            }));
                             setTimeout(() => { tg.close(); }, 150);
                         } catch (err) {
-                            document.getElementById('debug-log').innerText = "Ошибка Telegram: Кнопка Menu Button блокирует отправку. Используйте кнопку из /start";
-                            document.getElementById('spin-btn').disabled = false;
+                            tg.close();
                         }
                     } else {
-                        alert("Тест на ПК! Выпал сектор: " + winner.emoji + " " + winner.name);
+                        alert(`Тест! Выпал приз: ${winner.name}. Твой город: ${userLocation}`);
                         document.getElementById('spin-btn').disabled = false;
                     }
                 }
