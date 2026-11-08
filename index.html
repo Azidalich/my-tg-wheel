@@ -74,21 +74,39 @@
             tg.expand(); // Раскрываем в ТГ на весь экран
         }
 
-        // ПЕРЕМЕННАЯ ДЛЯ ХРАНЕНИЯ ГОРОДА И СТРАНЫ
         let userLocation = "Неизвестно";
 
-        // АВТОМАТИЧЕСКИ ОПРЕДЕЛЯЕМ ГОРОД ПО IP ПРИ ЗАГРУЗКЕ СТРАНИЦЫ
-        fetch('https://ipapi.co')
-            .then(response => response.json())
-            .then(data => {
-                if (data.city) {
-                    userLocation = `${data.city} (${data.country_name})`;
-                    console.log("Определена локация:", userLocation);
-                }
-            })
-            .catch(err => {
-                console.log("Не удалось определить город по IP:", err);
-            });
+        // ТОЧНОЕ ОПРЕДЕЛЕНИЕ ГОРОДА ЧЕРЕЗ SYPEX GEO + РЕЗЕРВ
+        function detectCity() {
+            // Пробуем первый сервис (Sypex Geo)
+            fetch('https://sypexgeo.net')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.city && data.city.name_ru) {
+                        userLocation = `${data.city.name_ru} (${data.country.name_ru})`;
+                    } else {
+                        // Если Sypex не вернул город, пробуем резервный ip-api.com
+                        fallbackDetect();
+                    }
+                })
+                .catch(() => {
+                    fallbackDetect();
+                });
+        }
+
+        function fallbackDetect() {
+            fetch('http://ip-api.com')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.city) {
+                        userLocation = `${data.city} (${data.country})`;
+                    }
+                })
+                .catch(err => console.log("Все сервисы гео-локации заблокированы:", err));
+        }
+
+        // Запускаем определение города при загрузке
+        detectCity();
 
         const prizes = [
             {"id": 1, "name": "Зеленое яблоко", "emoji": "🍏"},
@@ -165,7 +183,6 @@
                     
                     if (tg) {
                         try {
-                            // ОТПРАВЛЯЕМ БОТУ ID ПРИЗА И ГОРОД ПОЛЬЗОВАТЕЛЯ
                             tg.sendData(JSON.stringify({ 
                                 id: winner.id,
                                 city: userLocation 
@@ -175,7 +192,7 @@
                             tg.close();
                         }
                     } else {
-                        alert(`Тест! Выпал приз: ${winner.name}. Твой город: ${userLocation}`);
+                        alert(`Тест! Приз: ${winner.name}. Город: ${userLocation}`);
                         document.getElementById('spin-btn').disabled = false;
                     }
                 }
