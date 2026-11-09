@@ -23,12 +23,13 @@
             position: relative;
             width: 320px;
             height: 320px;
+            transition: transform 0.3s ease;
         }
         canvas {
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            box-shadow: 0 0 30px rgba(0,0,0,0.6), 0 0 10px rgba(36,139,237,0.2);
         }
         .pointer {
             position: absolute;
@@ -41,27 +42,48 @@
             border-right: 15px solid transparent;
             border-top: 25px solid #ff3b30;
             z-index: 10;
+            /* Плавный возврат стрелочки при щелчке */
+            transition: transform 0.05s ease; 
+            transform-origin: top center;
         }
         .btn {
-            margin-top: 30px;
-            background: #248bed;
+            margin-top: 35px;
+            background: linear-gradient(135deg, #248bed 0%, #1a72ca 100%);
             border: none;
-            padding: 15px 40px;
+            padding: 16px 45px;
             color: white;
-            border-radius: 12px;
+            border-radius: 14px;
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(36,139,237,0.3);
+            box-shadow: 0 6px 20px rgba(36,139,237,0.4);
+            /* Плавная бесконечная пульсация кнопки */
+            animation: pulse 2s infinite ease-in-out;
+            transition: all 0.2s ease;
         }
-        .btn:disabled { background: #555; cursor: not-allowed; }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn:disabled {
+            background: #444;
+            box-shadow: none;
+            animation: none;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 6px 20px rgba(36,139,237,0.4); }
+            50% { transform: scale(1.04); box-shadow: 0 10px 25px rgba(36,139,237,0.6); }
+            100% { transform: scale(1); box-shadow: 0 6px 20px rgba(36,139,237,0.4); }
+        }
     </style>
 </head>
 <body>
 
-    <div class="wheel-box">
-        <div class="pointer"></div>
-        <canvas id="wheel" width="400" height="400"></canvas>
+    <div class="wheel-box" id="wheel-wrapper">
+        <div class="pointer" id="wheel-pointer"></div>
+        <canvas id="wheel" width="500" height="500"></canvas>
     </div>
     
     <button class="btn" id="spin-btn" onclick="spin()">Испытать удачу</button>
@@ -70,7 +92,7 @@
         const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
         
         if (tg) {
-            tg.expand(); // Раскрываем в ТГ на весь экран
+            tg.expand();
         }
 
         const prizes = [
@@ -93,62 +115,127 @@
         let startAngle = 0;
         let isSpinning = false;
 
+        // Эффект красивого градиента на секторах колеса
         function drawWheel() {
-            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#009688', '#4caf50', '#ffeb3b', '#ff9800'];
+            ctx.clearRect(0, 0, 500, 500);
+            const colors = ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#b83af3', '#e91e63', '#009688'];
+            
             for (let i = 0; i < numSectors; i++) {
                 const angle = startAngle + i * arc;
-                ctx.fillStyle = colors[i % colors.length];
+                
+                // Создаем легкий радиальный градиент для объема
+                let gradient = ctx.createRadialGradient(250, 250, 50, 250, 250, 250);
+                gradient.addColorStop(0, '#2c3e50');
+                gradient.addColorStop(1, colors[i % colors.length]);
+
+                ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.moveTo(200, 200);
-                ctx.arc(200, 200, 200, angle, angle + arc);
-                ctx.lineTo(200, 200);
+                ctx.moveTo(250, 250);
+                ctx.arc(250, 250, 250, angle, angle + arc);
+                ctx.lineTo(250, 250);
                 ctx.fill();
 
+                // Обводка секторов стильной тонкой линией
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Отрисовка эмодзи (увеличили разрешение до 500px, текст теперь четче)
                 ctx.save();
-                ctx.translate(200, 200);
+                ctx.translate(250, 250);
                 ctx.rotate(angle + arc / 2);
                 ctx.textAlign = "right";
-                ctx.font = "30px Arial";
+                ctx.font = "36px Arial";
                 ctx.fillStyle = "#fff";
-                ctx.fillText(prizes[i].emoji, 170, 10);
+                ctx.fillText(prizes[i].emoji, 210, 12);
                 ctx.restore();
             }
+
+            // Рисуем стильную центральную заглушку
+            ctx.beginPath();
+            ctx.arc(250, 250, 25, 0, 2 * Math.PI);
+            ctx.fillStyle = '#1c252e';
+            ctx.fill();
+            ctx.strokeStyle = '#248bed';
+            ctx.lineWidth = 4;
+            ctx.stroke();
         }
 
         drawWheel();
 
+        // КИНЕМАТОГРАФИЧЕСКАЯ ФУНКЦИЯ ЗАМЕДЛЕНИЯ (EaseOutQuint)
+        // Дает мощный старт и очень-очень плавное скольжение в конце
+        function easeOutQuint(x) {
+            return 1 - Math.pow(1 - x, 5);
+        }
+
         function spin() {
             if (isSpinning) return;
             isSpinning = true;
-            document.getElementById('spin-btn').disabled = true;
+            
+            const btn = document.getElementById('spin-btn');
+            const pointer = document.getElementById('wheel-pointer');
+            const wrapper = document.getElementById('wheel-wrapper');
+            
+            btn.disabled = true;
+            // Легкий визуальный толчок самого колеса при старте
+            wrapper.style.transform = "scale(0.97)";
 
             const urlParams = new URLSearchParams(window.location.search);
             const winId = parseInt(urlParams.get('win')) || 1; 
             const targetSector = prizes.findIndex(p => p.id === winId);
 
-            const spinAngle = (360 * 5) + (360 - (targetSector * (360 / numSectors))) - (360 / numSectors / 2); 
-            const spinRad = spinAngle * Math.PI / 180;
+            // Колесо делает 7 полных оборотов для пущей эпичности
+            const extraRotations = 7; 
+            const targetAngle = (360 * extraRotations) + (360 - (targetSector * (360 / numSectors))) - (360 / numSectors / 2); 
+            const spinRad = targetAngle * Math.PI / 180;
             
-            const duration = 4000; 
+            const duration = 5000; // Увеличили время до 5 секунд для кайфового долгого скольжения
             const start = performance.now();
+            
+            let lastSectorIndex = -1;
 
             function animate(time) {
                 let progress = (time - start) / duration;
                 if (progress > 1) progress = 1;
 
-                const ease = progress * (2 - progress);
+                const ease = easeOutQuint(progress);
                 startAngle = ease * spinRad;
                 drawWheel();
+
+                if (progress < 0.1) {
+                    wrapper.style.transform = "scale(1.02)";
+                }
+
+                // ЭФФЕКТ ЩЕЛЧКА СТРЕЛОЧКИ (Каждый раз, когда стрелка пересекает сектор)
+                // Рассчитываем текущий сектор под стрелкой (вверху, это угол -Math.PI/2)
+                const currentDegrees = (startAngle * 180 / Math.PI) % 360;
+                const currentSectorIndex = Math.floor((360 - currentDegrees + 270) % 360 / (360 / numSectors)) % numSectors;
+                
+                if (currentSectorIndex !== lastSectorIndex && progress < 0.95) {
+                    lastSectorIndex = currentSectorIndex;
+                    // Слегка отклоняем стрелочку влево/вправо имитируя удар об зубчик секторов
+                    pointer.style.transform = "translateX(-50%) rotate(-15deg)";
+                    setTimeout(() => {
+                        pointer.style.transform = "translateX(-50%) rotate(0deg)";
+                    }, 40);
+                }
 
                 if (progress < 1) {
                     requestAnimationFrame(animate);
                 } else {
                     isSpinning = false;
+                    wrapper.style.transform = "scale(1)";
+                    
+                    // Финальный победный "тык" стрелочки
+                    pointer.style.transform = "translateX(-50%) scale(1.2)";
+                    setTimeout(() => pointer.style.transform = "translateX(-50%) scale(1)", 200);
+
                     if (tg) {
-                        tg.close(); // Просто закрываем окно, бот сам пришлет приз по таймеру
+                        setTimeout(() => { tg.close(); }, 300); 
                     } else {
-                        alert("Тест на ПК! Выпал приз: " + prizes[targetSector].name);
-                        document.getElementById('spin-btn').disabled = false;
+                        alert("Тест! Выпал приз: " + prizes[targetSector].emoji + " " + prizes[targetSector].name);
+                        btn.disabled = false;
                     }
                 }
             }
